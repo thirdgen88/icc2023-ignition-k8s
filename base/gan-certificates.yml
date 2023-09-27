@@ -1,0 +1,73 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ignition-gan-ca
+spec:
+  isCA: true
+  commonName: ignition-gan-ca
+  secretName: ignition-gan-ca
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  duration: 17520h  # 2 years
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ignition-gan-issuer
+spec:
+  ca:
+    secretName: ignition-gan-ca
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ignition-gan-metro-keystore
+type: Opaque
+data:
+  metro.keystore.password: bWV0cm8=  # metro 
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: frontend-gan
+spec:
+  secretName: frontend-gan-tls
+  issuerRef:
+    name: ignition-gan-issuer
+    kind: Issuer
+  commonName: "frontend"
+  dnsNames:
+  - "*.ign-frontend"
+  duration: 8760h  # 1 year
+  keystores:
+    pkcs12:
+      create: true
+      passwordSecretRef:
+        name: ignition-gan-metro-keystore
+        key: metro.keystore.password
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: backend-gan
+spec:
+  secretName: backend-gan-tls
+  issuerRef:
+    name: ignition-gan-issuer
+    kind: Issuer
+  commonName: "backend"
+  dnsNames:
+  - "*.ign-backend"
+  duration: 8760h  # 1 year
+  keystores:
+    pkcs12:
+      create: true
+      passwordSecretRef:
+        name: ignition-gan-metro-keystore
+        key: metro.keystore.password

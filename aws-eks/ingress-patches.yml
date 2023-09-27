@@ -1,0 +1,19 @@
+# Ingress Patches for AWS ALB Ingress Controller
+# yaml-language-server: $schema=https://json.schemastore.org/json-patch
+---
+- op: add
+  path: /metadata/annotations
+  value:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/load-balancer-name: ign-frontend
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/target-group-attributes: >
+      stickiness.enabled=true,
+      stickiness.type=lb_cookie,
+      stickiness.lb_cookie.duration_seconds=86400
+    alb.ingress.kubernetes.io/healthcheck-path: /system/gwinfo
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+#    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-west-1:xxxxxxxxxxxx:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+- op: add
+  path: /spec/ingressClassName
+  value: alb

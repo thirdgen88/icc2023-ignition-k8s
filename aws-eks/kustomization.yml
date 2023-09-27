@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../base
+patches:
+# Add Amazon ALB Ingress Controller annotations to the frontend Ingress
+- path: ingress-patches.yml
+  target:
+    kind: Ingress
+    name: ign-frontend
+# Lower cpu resources requests for our demo EKS cluster
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "500m"
+  target:
+    kind: StatefulSet
+    name: ign-(backend|frontend)

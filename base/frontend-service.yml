@@ -1,0 +1,24 @@
+# Services
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ign-frontend
+spec:
+  selector:
+    name: ign-frontend
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  - name: gan
+    port: 8060
+    protocol: TCP
+    targetPort: gan
+  type: ClusterIP
+  clusterIP: None

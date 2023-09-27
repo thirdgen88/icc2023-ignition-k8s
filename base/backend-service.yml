@@ -1,0 +1,66 @@
+# Services
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ign-backend
+spec:
+  selector:
+    name: ign-backend
+  ports:
+  - name: http
+    port: 8088
+    protocol: TCP
+  - name: https
+    port: 8043
+    protocol: TCP
+  - name: gan
+    port: 8060
+    protocol: TCP
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ign-backend-primary
+spec:
+  selector:
+    statefulset.kubernetes.io/pod-name: ign-backend-0
+  ports:
+  - name: http
+    port: 8088
+    protocol: TCP
+    targetPort: http
+  - name: https
+    port: 8043
+    protocol: TCP
+    targetPort: https
+  - name: gan
+    port: 8060
+    protocol: TCP
+    targetPort: gan
+  type: ClusterIP
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ign-backend-backup
+spec:
+  selector:
+    statefulset.kubernetes.io/pod-name: ign-backend-1
+  ports:
+  - name: http
+    port: 8088
+    protocol: TCP
+    targetPort: http
+  - name: https
+    port: 8043
+    protocol: TCP
+    targetPort: https
+  - name: gan
+    port: 8060
+    protocol: TCP
+    targetPort: gan
+  type: ClusterIP
+  clusterIP: None

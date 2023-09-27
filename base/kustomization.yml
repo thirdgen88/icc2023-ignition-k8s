@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+commonLabels:
+  owner: inductiveautomation
+buildMetadata: 
+- managedByLabel
+- originAnnotations
+resources:
+- backend-statefulset.yml
+- backend-service.yml
+- frontend-statefulset.yml
+- frontend-service.yml
+- frontend-ingress.yml
+- gan-certificates.yml
+secretGenerator:
+- name: gateway-base-secrets
+  envs:
+  - secrets/base.env
+configMapGenerator:
+- name: ignition-config-scripts
+  files:
+  - scripts/seed-data-volume.sh
+  - scripts/seed-redundancy.sh
+  - scripts/prepare-gan-certificates.sh
+  - scripts/prepare-tls-certificates.sh
+  - scripts/invoke-args.sh
+  - scripts/redundant-health-check.sh
+- name: ignition-config-files
+  files:
+  - config/redundancy-primary.xml
+  - config/redundancy-backup.xml
+  - config/logback.xml
+- name: gateway-base-config
+  envs:
+  - config/gateway-base-config.env
+images:
+- name: inductiveautomation/ignition
+  newTag: 8.1.32

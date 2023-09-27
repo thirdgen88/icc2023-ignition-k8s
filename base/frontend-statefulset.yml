@@ -1,0 +1,131 @@
+# StatefulSets
+---
+# ign-frontend
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ign-frontend
+spec:
+  selector:
+    matchLabels:
+      name: ign-frontend
+  serviceName: ign-frontend
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        name: ign-frontend
+    spec:
+      securityContext:
+        runAsUser: 2003
+        runAsGroup: 2003
+        fsGroup: 2003
+        runAsNonRoot: true
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: name
+                operator: In
+                values:
+                - ign-frontend
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: gateway
+        image: inductiveautomation/ignition:latest
+        resources:
+          requests:
+            memory: "1280Mi"
+            cpu: "1000m"
+        args:
+        - -m
+        - "1024"
+        - -n
+        - "$(GATEWAY_SYSTEM_NAME)"
+        - -- 
+        - gateway.useProxyForwardedHeader=true
+        ports:
+        - name: http
+          containerPort: 8088
+        - name: https
+          containerPort: 8043
+        - name: gan
+          containerPort: 8060
+        envFrom:
+        - configMapRef:
+            name: gateway-base-config
+        - secretRef:
+            name: gateway-base-secrets
+        env:
+        - name: GATEWAY_NETWORK_0_HOST
+          value: "ign-backend-0.ign-backend"
+        - name: GATEWAY_NETWORK_1_HOST
+          value: "ign-backend-1.ign-backend"
+        - name: EAM_SETUP_INSTALLSELECTION
+          value: "Agent"
+        - name: EAM_AGENT_CONTROLLERSERVERNAME
+          value: "backend"
+        - name: GATEWAY_SYSTEM_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        - mountPath: /usr/local/bin/ignition/data
+          name: data
+        - mountPath: /run/secrets/gan-tls
+          name: gan-tls
+          readOnly: true
+        readinessProbe:
+          exec:
+            command:
+            - health-check.sh
+            - -t
+            - "3"
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          failureThreshold: 10
+          timeoutSeconds: 3
+      initContainers:
+      - name: preconfigure
+        image: inductiveautomation/ignition:latest
+        command:
+        - /config/scripts/invoke-args.sh
+        args:
+        - /config/scripts/seed-data-volume.sh
+        - /config/scripts/prepare-gan-certificates.sh
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        - mountPath: /config/scripts
+          name: ignition-config-scripts
+        - mountPath: /config/files
+          name: ignition-config-files
+        - mountPath: /run/secrets/gan-tls
+          name: gan-tls
+        - mountPath: /run/secrets/ignition-gan-ca
+          name: ignition-gan-ca
+          readOnly: true
+      volumes:
+      - name: ignition-config-scripts
+        configMap:
+          name: ignition-config-scripts
+          defaultMode: 0755
+      - name: ignition-config-files
+        configMap:
+          name: ignition-config-files
+          defaultMode: 0644
+      - name: ignition-gan-ca
+        secret:
+          secretName: ignition-gan-ca
+      - name: gan-tls
+        secret:
+          secretName: frontend-gan-tls
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 3Gi

@@ -1,0 +1,132 @@
+# StatefulSets
+---
+# ign-backend Redundant Pair
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ign-backend
+spec:
+  selector:
+    matchLabels:
+      name: ign-backend
+  serviceName: ign-backend
+  replicas: 2  # should only ever be 2 for redundancy
+  updateStrategy:
+    # type: OnDelete
+    # rollingUpdate: null
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      partition: 0
+  template:
+    metadata:
+      labels:
+        name: ign-backend
+    spec:
+      securityContext:
+        runAsUser: 2003
+        runAsGroup: 2003
+        fsGroup: 2003
+        runAsNonRoot: true
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: name
+                operator: In
+                values:
+                - ign-backend
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: gateway
+        image: inductiveautomation/ignition:latest
+        resources:
+          requests:
+            memory: "1280Mi"
+            cpu: "1000m"
+        args:
+        - -m
+        - "1024"
+        - -n
+        - "backend"
+        - --
+        - gateway.useProxyForwardedHeader=true
+        ports:
+        - name: http
+          containerPort: 8088
+        - name: https
+          containerPort: 8043
+        - name: gan
+          containerPort: 8060
+        envFrom:
+        - configMapRef:
+            name: gateway-base-config
+        - secretRef:
+            name: gateway-base-secrets
+        env:
+        - name: EAM_SETUP_INSTALLSELECTION
+          value: "Controller"
+        - name: FOO
+          value: "BAZ"
+        volumeMounts:
+        - mountPath: /usr/local/bin/ignition/data
+          name: data
+        - mountPath: /config/scripts
+          name: ignition-config-scripts
+          readOnly: true
+        - mountPath: /run/secrets/gan-tls
+          name: gan-tls
+          readOnly: true
+        readinessProbe:
+          exec:
+            command: [ "/config/scripts/redundant-health-check.sh", "-t", "3" ]
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 2
+          timeoutSeconds: 3
+      initContainers:
+      - name: preconfigure
+        image: inductiveautomation/ignition:latest
+        command:
+        - /config/scripts/invoke-args.sh
+        args:
+        - /config/scripts/seed-data-volume.sh
+        - /config/scripts/seed-redundancy.sh
+        - /config/scripts/prepare-gan-certificates.sh
+        - cp /config/files/logback.xml /data/logback.xml
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        - mountPath: /config/files
+          name: ignition-config-files
+        - mountPath: /config/scripts
+          name: ignition-config-scripts
+        - mountPath: /run/secrets/gan-tls
+          name: gan-tls
+        - mountPath: /run/secrets/ignition-gan-ca
+          name: ignition-gan-ca
+          readOnly: true
+      volumes:
+      - name: ignition-config-scripts
+        configMap:
+          name: ignition-config-scripts
+          defaultMode: 0755
+      - name: ignition-config-files
+        configMap:
+          name: ignition-config-files
+          defaultMode: 0644
+      - name: ignition-gan-ca
+        secret:
+          secretName: ignition-gan-ca
+      - name: gan-tls
+        secret:
+          secretName: backend-gan-tls
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 3Gi
